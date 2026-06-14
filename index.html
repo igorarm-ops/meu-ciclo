@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#c75b7a" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Billings" />
+<link rel="manifest" href="manifest.json" />
+<title>Meu Ciclo — Método Billings</title>
+<style>
+  :root{
+    --bg:#fff7f4;
+    --surface:#ffffff;
+    --surface-2:#fdeef0;
+    --ink:#3a2e34;
+    --ink-soft:#7a6b72;
+    --line:#f0dfe2;
+    --rose:#c75b7a;
+    --rose-soft:#e8849b;
+    --rose-bg:#fbe7ec;
+    /* estados */
+    --mens:#e5524f;       /* menstruação */
+    --mens-bg:#fde3e2;
+    --fertil:#f2b705;     /* fértil (selo bebê) */
+    --fertil-bg:#fef3d3;
+    --infertil:#2fae7a;   /* infértil / disponível */
+    --infertil-bg:#d9f3e8;
+    --seco:#6aa9d6;       /* dias secos / primeiros dias */
+    --seco-bg:#e2eff9;
+    --shadow:0 6px 20px rgba(199,91,122,.10);
+    --radius:18px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg);color:var(--ink);
+    line-height:1.5;-webkit-font-smoothing:antialiased;
+    padding-bottom:96px;
+  }
+  .wrap{max-width:560px;margin:0 auto;padding:0 16px}
+  header.app{
+    position:sticky;top:0;z-index:30;
+    background:linear-gradient(180deg,var(--bg) 70%,rgba(255,247,244,0));
+    padding:14px 16px 8px;max-width:560px;margin:0 auto;
+  }
+  .brand{display:flex;align-items:center;gap:9px}
+  .brand .logo{
+    width:34px;height:34px;border-radius:11px;flex:0 0 auto;
+    background:linear-gradient(135deg,var(--rose),var(--rose-soft));
+    display:grid;place-items:center;color:#fff;font-size:18px;box-shadow:var(--shadow)
+  }
+  .brand h1{font-size:17px;margin:0;font-weight:700;letter-spacing:-.2px}
+  .brand small{display:block;color:var(--ink-soft);font-weight:500;font-size:11.5px}
+
+  /* Views */
+  .view{display:none;animation:fade .25s ease}
+  .view.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  .card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;margin:14px 0;border:1px solid var(--line)}
+  .card h2{font-size:15px;margin:0 0 4px;letter-spacing:-.2px}
+  .card .sub{color:var(--ink-soft);font-size:12.5px;margin:0 0 12px}
+
+  /* Banner de status do dia */
+  .status{border-radius:22px;padding:20px;color:#fff;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .status .glyph{position:absolute;right:-8px;top:-10px;font-size:96px;opacity:.16;line-height:1}
+  .status .kcycle{font-size:12.5px;opacity:.95;font-weight:600;letter-spacing:.3px;text-transform:uppercase}
+  .status .verdict{font-size:25px;font-weight:800;margin:6px 0 2px;letter-spacing:-.4px}
+  .status .desc{font-size:13.5px;opacity:.96;max-width:90%}
+  .status .pill{display:inline-block;margin-top:12px;background:rgba(255,255,255,.22);padding:6px 12px;border-radius:999px;font-size:12.5px;font-weight:700}
+  .st-mens{background:linear-gradient(135deg,#e5524f,#f07b6f)}
+  .st-fertil{background:linear-gradient(135deg,#e7920a,#f2b705)}
+  .st-infertil{background:linear-gradient(135deg,#1f9d6e,#43c08c)}
+  .st-seco{background:linear-gradient(135deg,#5a93c4,#7bb4dd)}
+  .st-none{background:linear-gradient(135deg,#9d8e95,#b7a6ad)}
+
+  /* Botões / chips */
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:none;cursor:pointer;
+    font-family:inherit;font-weight:700;font-size:14px;border-radius:14px;padding:13px 16px;transition:.15s}
+  .btn:active{transform:scale(.97)}
+  .btn-primary{background:var(--rose);color:#fff;width:100%;box-shadow:var(--shadow)}
+  .btn-ghost{background:var(--surface-2);color:var(--rose)}
+  .btn-line{background:transparent;border:1.5px solid var(--line);color:var(--ink-soft);font-weight:600}
+  .btn-sm{padding:9px 12px;font-size:12.5px;border-radius:11px}
+  .btn-row{display:flex;gap:8px;flex-wrap:wrap}
+
+  .opts{display:grid;grid-template-columns:1fr;gap:8px}
+  .opt{display:flex;align-items:center;gap:12px;border:1.5px solid var(--line);background:var(--surface);
+    border-radius:14px;padding:12px 13px;cursor:pointer;transition:.15s;text-align:left;width:100%;font-family:inherit}
+  .opt:active{transform:scale(.99)}
+  .opt .dot{width:14px;height:14px;border-radius:50%;flex:0 0 auto;border:2px solid currentColor}
+  .opt .ic{font-size:20px;width:24px;text-align:center;flex:0 0 auto}
+  .opt .tx{flex:1}
+  .opt .tx b{display:block;font-size:14px;font-weight:700}
+  .opt .tx span{display:block;font-size:11.5px;color:var(--ink-soft)}
+  .opt[data-sel="1"]{border-color:var(--rose);background:var(--rose-bg)}
+  .opt[data-sel="1"] .dot{background:var(--rose);border-color:var(--rose)}
+  .opt .lvl{font-size:10px;font-weight:800;padding:2px 7px;border-radius:999px;color:#fff}
+
+  .seg{display:flex;background:var(--surface-2);border-radius:13px;padding:4px;gap:4px}
+  .seg button{flex:1;border:none;background:transparent;padding:9px;border-radius:10px;font-family:inherit;
+    font-weight:700;font-size:13px;color:var(--ink-soft);cursor:pointer;transition:.15s}
+  .seg button[aria-pressed="true"]{background:#fff;color:var(--rose);box-shadow:0 2px 6px rgba(0,0,0,.06)}
+
+  label.fld{display:block;font-size:12px;font-weight:700;color:var(--ink-soft);margin:14px 0 6px}
+  input[type=date],input[type=time],input[type=text],select{
+    width:100%;border:1.5px solid var(--line);background:var(--surface);border-radius:12px;
+    padding:12px;font-size:15px;font-family:inherit;color:var(--ink)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+  /* Tira de selos (chart linear) */
+  .legend{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .lg{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-soft);font-weight:600}
+  .lg .sw{width:13px;height:13px;border-radius:4px;display:inline-block}
+  .strip{display:flex;gap:4px;overflow-x:auto;padding:6px 2px 12px;scrollbar-width:thin}
+  .cell{flex:0 0 auto;width:38px;text-align:center}
+  .cell .stamp{width:38px;height:46px;border-radius:9px;display:grid;place-items:center;font-size:18px;
+    border:1.5px solid rgba(0,0,0,.05);position:relative}
+  .cell .d{font-size:10px;color:var(--ink-soft);margin-top:3px;font-weight:600}
+  .cell .dd{font-size:9px;color:var(--ink-soft);opacity:.7}
+  .cell.today .stamp{outline:3px solid var(--rose);outline-offset:1px}
+  .cell .peak{position:absolute;top:-7px;right:-5px;background:var(--rose);color:#fff;font-size:9px;font-weight:800;
+    width:16px;height:16px;border-radius:50%;display:grid;place-items:center;box-shadow:var(--shadow)}
+
+  /* Roda do ciclo */
+  .wheel-wrap{display:flex;justify-content:center;margin:6px 0 2px}
+  svg.wheel{max-width:300px;width:100%;height:auto}
+
+  /* Histórico */
+  .stat-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;text-align:center}
+  .stat{background:var(--surface-2);border-radius:14px;padding:12px 6px}
+  .stat .n{font-size:22px;font-weight:800;color:var(--rose);letter-spacing:-.5px}
+  .stat .l{font-size:11px;color:var(--ink-soft);font-weight:600}
+  .hist-item{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+  .hist-item:last-child{border-bottom:none}
+  .hist-item .bar{flex:1;height:10px;border-radius:6px;background:var(--line);overflow:hidden;display:flex}
+  .hist-item .bar i{display:block;height:100%}
+
+  /* Aprender / acordeão */
+  details.acc{border:1px solid var(--line);border-radius:14px;margin:8px 0;overflow:hidden;background:var(--surface)}
+  details.acc summary{padding:14px;font-weight:700;font-size:14px;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center}
+  details.acc summary::-webkit-details-marker{display:none}
+  details.acc summary::after{content:"+";color:var(--rose);font-size:20px;font-weight:700}
+  details.acc[open] summary::after{content:"–"}
+  details.acc .body{padding:0 14px 14px;font-size:13.5px;color:var(--ink-soft)}
+  details.acc .body b{color:var(--ink)}
+
+  .note{background:var(--seco-bg);border:1px solid #cfe4f5;border-radius:14px;padding:13px;font-size:12.5px;color:#2c6493}
+  .warn{background:#fef3d3;border:1px solid #f4e2a0;border-radius:14px;padding:13px;font-size:12.5px;color:#8a6400}
+  .muted{color:var(--ink-soft);font-size:12px}
+
+  /* Streak / confiança */
+  .streak{display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,var(--rose-bg),#fff);border-radius:16px;padding:14px;border:1px solid var(--line)}
+  .streak .big{font-size:30px}
+  .streak b{font-size:18px}
+
+  /* Bottom nav */
+  nav.tabs{position:fixed;bottom:0;left:0;right:0;z-index:40;background:rgba(255,255,255,.93);
+    backdrop-filter:blur(12px);border-top:1px solid var(--line);display:flex;
+    padding:8px 6px calc(8px + env(safe-area-inset-bottom));max-width:560px;margin:0 auto}
+  nav.tabs button{flex:1;background:none;border:none;cursor:pointer;font-family:inherit;color:var(--ink-soft);
+    display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10.5px;font-weight:700;padding:4px}
+  nav.tabs button .i{font-size:21px;line-height:1}
+  nav.tabs button[aria-current="true"]{color:var(--rose)}
+
+  .toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%) translateY(20px);background:var(--ink);
+    color:#fff;padding:12px 18px;border-radius:14px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;
+    transition:.3s;z-index:60;box-shadow:var(--shadow);max-width:90%}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  .empty{text-align:center;color:var(--ink-soft);padding:30px 10px}
+  .empty .e{font-size:40px;margin-bottom:8px}
+
+  /* Onboarding modal */
+  .modal{position:fixed;inset:0;background:rgba(58,46,52,.55);z-index:80;display:none;align-items:flex-end;justify-content:center}
+  .modal.show{display:flex}
+  .sheet{background:var(--surface);width:100%;max-width:560px;border-radius:24px 24px 0 0;padding:24px 20px calc(24px + env(safe-area-inset-bottom));box-shadow:0 -10px 40px rgba(0,0,0,.2);animation:slideUp .3s ease}
+  @keyframes slideUp{from{transform:translateY(100%)}to{transform:none}}
+  .sheet h2{margin:0 0 4px;font-size:20px}
+  .dots{display:flex;gap:6px;justify-content:center;margin:16px 0}
+  .dots i{width:7px;height:7px;border-radius:50%;background:var(--line)}
+  .dots i.on{background:var(--rose);width:20px;border-radius:4px}
+  .ob-ic{font-size:46px;text-align:center;margin:6px 0}
+</style>
+</head>
+<body>
+
+<header class="app">
+  <div class="brand">
+    <div class="logo">🌸</div>
+    <div>
+      <h1>Meu Ciclo</h1>
+      <small>Método Billings · registro do casal</small>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ===================== HOJE ===================== -->
+  <section id="v-hoje" class="view active">
+    <div id="statusBanner"></div>
+
+    <div class="card">
+      <div class="seg" id="dateSeg" style="margin-bottom:4px">
+        <button data-shift="-1" type="button">‹ Ontem</button>
+        <button data-shift="0" type="button" aria-pressed="true" id="segToday">Hoje</button>
+        <button data-shift="1" type="button" id="segNext">Amanhã ›</button>
+      </div>
+      <p class="sub" id="dateLabel" style="text-align:center;margin:10px 0 0"></p>
+    </div>
+
+    <div class="card">
+      <h2>1 · Está menstruada?</h2>
+      <p class="sub">Durante o sangramento o muco fica encoberto — por isso esses dias são tratados como possivelmente férteis.</p>
+      <div class="opts" id="mensOpts"></div>
+    </div>
+
+    <div class="card" id="obsCard">
+      <h2>2 · Observação do dia</h2>
+      <p class="sub">Registre <b>de manhã</b> e <b>à noite</b>. O dia recebe a observação mais fértil que ela teve.</p>
+
+      <div class="seg" id="periodSeg">
+        <button data-period="manha" type="button" aria-pressed="true">🌅 Manhã</button>
+        <button data-period="noite" type="button">🌙 Noite</button>
+      </div>
+
+      <label class="fld">Sensação ao passar (sem olhar) — o que sentiu na vulva</label>
+      <div class="opts" id="sensOpts"></div>
+
+      <label class="fld">Aparência (se observou)</label>
+      <div class="opts" id="appOpts"></div>
+
+      <button class="btn btn-primary" id="saveObs" style="margin-top:16px">Salvar observação 🌅</button>
+      <p class="muted" id="obsSaved" style="text-align:center;margin:10px 0 0"></p>
+    </div>
+
+    <div class="card" id="peakCard" style="display:none">
+      <h2>⭐ Dia Ápice (Pico)</h2>
+      <p class="sub" id="peakHint"></p>
+      <div class="btn-row">
+        <button class="btn btn-ghost btn-sm" id="peakConfirm">Confirmar Ápice neste dia</button>
+        <button class="btn btn-line btn-sm" id="peakClear">Remover marcação</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>3 · Relação e anotações</h2>
+      <p class="sub">Registrando a relação, o app aplica por vocês a regra dos dias alternados e avisa quando a leitura do dia seguinte pode estar mascarada.</p>
+      <button class="opt" id="sexBtn" data-sel="0">
+        <span class="dot"></span><span class="ic">💞</span>
+        <span class="tx"><b>Tivemos relação neste dia</b><span>fica visível só para vocês dois</span></span>
+      </button>
+      <label class="fld">Anotações do dia (opcional)</label>
+      <input type="text" id="noteInp" placeholder="remédio, estresse, viagem, exame...">
+      <button class="btn btn-line btn-sm" id="clearDay" style="width:100%;margin-top:14px">🧽 Limpar todos os registros deste dia</button>
+    </div>
+
+    <div class="streak" style="margin:14px 0">
+      <div class="big">🔥</div>
+      <div>
+        <b id="streakN">0 dias</b> de registro seguido<br>
+        <span class="muted" id="streakMsg">Cada anotação aumenta a confiança no método.</span>
+      </div>
+    </div>
+
+    <div class="card" id="miniPred" style="display:none"></div>
+  </section>
+
+  <!-- ===================== CICLO ===================== -->
+  <section id="v-ciclo" class="view">
+    <div class="card">
+      <div class="seg" style="margin-bottom:12px">
+        <button id="cycPrev" type="button">‹ Anterior</button>
+        <button id="cycCur" type="button" aria-pressed="true">Atual</button>
+        <button id="cycNext" type="button">Próximo ›</button>
+      </div>
+      <h2 id="cycTitle">Ciclo atual</h2>
+      <p class="sub" id="cicloSub">—</p>
+      <div class="wheel-wrap"><div id="wheel"></div></div>
+      <div class="legend">
+        <span class="lg"><span class="sw" style="background:var(--mens)"></span>Menstruação</span>
+        <span class="lg"><span class="sw" style="background:var(--seco)"></span>Dias secos</span>
+        <span class="lg"><span class="sw" style="background:var(--fertil)"></span>Fértil 👶</span>
+        <span class="lg"><span class="sw" style="background:var(--infertil)"></span>Infértil</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Gráfico do ciclo</h2>
+      <p class="sub">A tira clássica do Billings. Deslize para o lado. ⭐/P marca o Ápice; 1·2·3 são os dias após; 💗 relação; 📝 anotação.</p>
+      <div class="strip" id="strip"></div>
+    </div>
+
+    <div class="card">
+      <h2>Janela fértil provável</h2>
+      <p class="sub">Estimativa com base nos seus ciclos anteriores. <b>A observação do dia sempre vale mais que a previsão.</b></p>
+      <div id="prediction"></div>
+    </div>
+  </section>
+
+  <!-- ===================== HISTÓRICO ===================== -->
+  <section id="v-hist" class="view">
+    <div class="card">
+      <h2>Seus números</h2>
+      <p class="sub">Quanto mais ciclos registrados, mais o padrão fica claro — e mais confiança vocês ganham.</p>
+      <div class="stat-row">
+        <div class="stat"><div class="n" id="stCycles">0</div><div class="l">ciclos</div></div>
+        <div class="stat"><div class="n" id="stAvg">–</div><div class="l">duração média</div></div>
+        <div class="stat"><div class="n" id="stPeak">–</div><div class="l">ápice médio</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Ciclos anteriores</h2>
+      <div id="histList"></div>
+    </div>
+  </section>
+
+  <!-- ===================== APRENDER ===================== -->
+  <section id="v-aprender" class="view">
+    <div class="card" style="background:linear-gradient(135deg,var(--rose-bg),#fff)">
+      <h2>Confiança vem de entender 💛</h2>
+      <p class="sub" style="margin-bottom:0">O método Billings, bem aplicado, é muito eficaz para evitar gravidez. A confiança cresce quando vocês entendem <i>por que</i> cada regra funciona. Leia com calma — juntos.</p>
+    </div>
+
+    <details class="acc"><summary>O que é o Método Billings?</summary><div class="body">
+      É um método de reconhecimento da fertilidade baseado na <b>observação do muco cervical</b>. O corpo dá sinais claros: perto da ovulação o muco fica escorregadio, elástico e transparente (como clara de ovo). Identificando esses dias, o casal sabe quando é fértil e quando não é. Não usa remédio nem hormônio.
+    </div></details>
+
+    <details class="acc"><summary>Situações especiais — procure a instrutora</summary><div class="body">
+      Algumas fases pedem <b>regras adaptadas, com acompanhamento de instrutora</b>:<br>
+      • <b>Amamentação e pós-parto</b> — a ovulação pode demorar a voltar e o padrão muda.<br>
+      • <b>Pré-menopausa</b> — ciclos irregulares e "picos de retorno" são comuns.<br>
+      • <b>Parou a pílula há pouco</b> — os primeiros ciclos podem ser atípicos.<br>
+      • <b>Nunca tem dia totalmente seco</b> (secreção contínua) — é preciso identificar com a instrutora o seu <b>Padrão Básico Infértil</b>.<br>
+      • <b>Sangramentos fora do período</b> — registre no app e leve para a consulta.<br>
+      Nessas fases o app continua sendo o diário de vocês, mas a decisão sobre dias disponíveis deve ser confirmada com a instrutora.
+    </div></details>
+
+    <details class="acc"><summary>Como observar (o passo a passo dela)</summary><div class="body">
+      • Ao longo do dia, repare na <b>sensação</b> na vulva ao caminhar/passar: seca, úmida, molhada ou escorregadia.<br>
+      • Sem investigar internamente — apenas o que sente e o que aparece naturalmente.<br>
+      • À <b>noite</b>, registre a observação <b>mais fértil</b> do dia inteiro.<br>
+      • Anotar de manhã e de noite cria o hábito e deixa o padrão nítido.
+    </div></details>
+
+    <details class="acc"><summary>O Dia Ápice (a chave do método)</summary><div class="body">
+      O <b>Ápice (Pico)</b> é o <b>último dia</b> com sensação escorregadia/lubrificante ou muco transparente e elástico. Você só o reconhece <b>no dia seguinte</b>, quando a sensação muda (seca ou pegajosa). A ovulação acontece bem perto dele. <b>Regra do Ápice:</b> os 3 dias após o Ápice ainda são férteis. Do <b>4º dia após o Ápice em diante</b>, a fase é infértil até a próxima menstruação.
+    </div></details>
+
+    <details class="acc"><summary>Regras para EVITAR gravidez</summary><div class="body">
+      <b>1. Menstruação:</b> evite (o sangue encobre o muco).<br>
+      <b>2. Primeiros dias secos</b> (antes de qualquer muco): disponível <b>só à noite, em dias alternados</b> — o dia seguinte à relação é "de checagem", pois o sêmen pode mascarar o muco. Registrando a relação no app, ele controla isso por vocês.<br>
+      <b>3. Qualquer sinal de muco, umidade ou sangramento:</b> fértil → evite <b>imediatamente</b>. Se o muco passar sem virar Ápice, aguardem 3 dias secos para voltar às regras dos primeiros dias.<br>
+      <b>4. Do muco até o Ápice + 3 dias:</b> fértil → evite.<br>
+      <b>5. Do 4º dia após o Ápice até a menstruação:</b> infértil → disponível, qualquer dia. (Se muco fértil voltar, o app volta a marcar fértil por segurança.)<br>
+      <span style="color:var(--rose)"><b>Na dúvida, trate como fértil.</b></span>
+    </div></details>
+
+    <details class="acc"><summary>Por que confiar no método</summary><div class="body">
+      Estudos com uso correto mostram alta eficácia. A confiança vem de:<br>
+      • <b>Constância</b> — observar e anotar todo dia.<br>
+      • <b>Reconhecer o padrão</b> — após 2–3 ciclos o corpo dela fica previsível.<br>
+      • <b>Combinar como casal</b> — as regras só funcionam se os dois respeitarem os dias férteis.<br>
+      • <b>Na dúvida, esperar.</b> O custo de esperar um dia é pequeno.
+    </div></details>
+
+    <div class="warn" style="margin-top:14px">
+      <b>Importante e honesto:</b> este app é uma ferramenta de <b>registro e visualização</b> — não substitui o aprendizado com um instrutor. Para usar o Billings com segurança para evitar gravidez, façam o acompanhamento com um instrutor credenciado (no Brasil: <b>Centro Billings Brasil / WOOMB</b>). Nenhum método é 100%. Conhecendo bem as regras e respeitando os dias férteis, a eficácia é alta.
+    </div>
+  </section>
+
+  <!-- ===================== CONFIG ===================== -->
+  <section id="v-config" class="view">
+    <div class="card">
+      <h2>⏰ Lembretes (manhã e noite)</h2>
+      <p class="sub">A forma mais confiável: baixar os lembretes para o calendário do celular dela. Tocam todo dia, mesmo com o app fechado.</p>
+      <div class="grid2">
+        <div><label class="fld">Lembrete da manhã</label><input type="time" id="remMorning" value="08:00"></div>
+        <div><label class="fld">Lembrete da noite</label><input type="time" id="remNight" value="21:30"></div>
+      </div>
+      <button class="btn btn-primary" id="dlIcs" style="margin-top:14px">📅 Baixar lembretes (.ics)</button>
+      <button class="btn btn-line" id="notifBtn" style="margin-top:8px;width:100%">🔔 Ativar notificação enquanto o app estiver aberto</button>
+      <p class="muted" style="margin-top:10px">Dica: abra este app no celular dela e use “Adicionar à tela inicial” para ficar como um aplicativo.</p>
+    </div>
+
+    <div class="card">
+      <h2>👫 Sincronizar entre celulares</h2>
+      <p class="sub">Para o casal acompanhar junto: quem registrou toca em <b>Enviar</b> e manda o arquivo pelo WhatsApp. No outro celular, toque em <b>Receber</b> e escolha o arquivo. Os registros se <b>combinam</b> — vale o mais recente de cada dia, nada se perde.</p>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="syncSend" style="flex:1">📤 Enviar</button>
+        <button class="btn btn-ghost" id="syncRecv" style="flex:1">📥 Receber</button>
+        <input type="file" id="importFile" accept="application/json,.json" style="display:none">
+      </div>
+      <p class="muted" style="margin-top:10px">O arquivo também serve de backup. Os dados só saem do aparelho quando você mesma envia.</p>
+    </div>
+
+    <div class="card">
+      <h2>🔒 Privacidade</h2>
+      <p class="sub">Opcional: peça um PIN de 4 números ao abrir o app. É uma proteção simples para olhares curiosos.</p>
+      <div class="btn-row">
+        <button class="btn btn-ghost btn-sm" id="pinSet">Definir PIN</button>
+        <button class="btn btn-line btn-sm" id="pinOff">Remover PIN</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Recomeçar ciclo manualmente</h2>
+      <p class="sub">Normalmente o ciclo recomeça sozinho quando você marca menstruação. Use isto só se precisar corrigir.</p>
+      <button class="btn btn-line" id="forceStart" style="width:100%">Marcar início de ciclo no dia selecionado</button>
+    </div>
+
+    <div class="card">
+      <button class="btn btn-line" id="howto" style="width:100%;margin-bottom:8px">📖 Rever introdução</button>
+      <button class="btn btn-line" id="resetBtn" style="width:100%;color:var(--mens);border-color:#f2c4c2">🗑️ Apagar todos os dados</button>
+    </div>
+    <p class="muted" style="text-align:center;padding:6px 0 16px">Feito com 💛 para você e sua esposa.</p>
+  </section>
+</main>
+
+<nav class="tabs">
+  <button data-view="hoje" aria-current="true"><span class="i">📝</span>Hoje</button>
+  <button data-view="ciclo"><span class="i">🌙</span>Ciclo</button>
+  <button data-view="hist"><span class="i">📊</span>Histórico</button>
+  <button data-view="aprender"><span class="i">💡</span>Aprender</button>
+  <button data-view="config"><span class="i">⚙️</span>Ajustes</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<!-- Tela de bloqueio (PIN opcional) -->
+<div id="lock" style="position:fixed;inset:0;background:var(--bg);z-index:100;display:none;align-items:center;justify-content:center;text-align:center">
+  <div>
+    <div style="font-size:54px">🌸</div>
+    <h2 style="margin:8px 0 14px">Digite o PIN</h2>
+    <input id="pinInp" type="password" inputmode="numeric" maxlength="4" autocomplete="off"
+      style="font-size:30px;letter-spacing:12px;text-align:center;width:170px;border:1.5px solid var(--line);border-radius:14px;padding:10px;background:#fff">
+    <p id="pinErr" class="muted" style="min-height:18px;color:var(--mens);font-weight:600"></p>
+  </div>
+</div>
+
+<!-- Onboarding -->
+<div class="modal" id="onb">
+  <div class="sheet">
+    <div class="ob-ic" id="obIc">🌸</div>
+    <h2 id="obTitle"></h2>
+    <p class="sub" id="obText" style="font-size:14px"></p>
+    <div class="dots" id="obDots"></div>
+    <button class="btn btn-primary" id="obNext">Continuar</button>
+    <button class="btn btn-line" id="obSkip" style="width:100%;margin-top:8px">Pular</button>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   MEU CICLO — Método Billings (app local, sem servidor)
+   Dados em localStorage. Nada sai do aparelho.
+   ============================================================ */
+
+const KEY = 'billings_v1';
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+
+/* ---------- Modelo de dados ---------- */
+// store.days[YYYY-MM-DD] = { mens:0..4, obs:{manha:{sens,app}, noite:{sens,app}}, peak:true }
+let store = load();
+let selDate = today();
+let curPeriod = 'manha';
+
+function load(){
+  try{ return JSON.parse(localStorage.getItem(KEY)) || {days:{}, seen:false}; }
+  catch(e){ return {days:{}, seen:false}; }
+}
+function save(){ localStorage.setItem(KEY, JSON.stringify(store)); }
+
+/* ---------- Datas ---------- */
+function today(){ return iso(new Date()); }
+function iso(d){ const z=new Date(d); z.setMinutes(z.getMinutes()-z.getTimezoneOffset()); return z.toISOString().slice(0,10); }
+function addDays(s,n){ const d=new Date(s+'T00:00'); d.setDate(d.getDate()+n); return iso(d); }
+function diffDays(a,b){ return Math.round((new Date(b+'T00:00')-new Date(a+'T00:00'))/86400000); }
+function fmtLong(s){
+  const d=new Date(s+'T00:00');
+  const dias=['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
+  const mes=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  return `${dias[d.getDay()]}, ${d.getDate()} de ${mes[d.getMonth()]}`;
+}
+
+/* ---------- Catálogos (Billings) ---------- */
+const MENS = [
+  {v:0,ic:'⚪',t:'Não',s:'Sem sangramento'},
+  {v:1,ic:'🩸',t:'Escape / marrom',s:'Manchas leves'},
+  {v:2,ic:'🔴',t:'Leve',s:'Fluxo pequeno'},
+  {v:3,ic:'🔴',t:'Moderado',s:'Fluxo normal'},
+  {v:4,ic:'🔴',t:'Intenso',s:'Fluxo forte'},
+];
+// fertility score: 0 seco · 1 baixo · 2 médio · 3 pico
+const SENS = [
+  {v:'seca',  ic:'🍃',t:'Seca',        s:'Nada, áspera',          sc:0,lvl:'#2fae7a'},
+  {v:'umida', ic:'💧',t:'Úmida',       s:'Levemente úmida',       sc:1,lvl:'#f2b705'},
+  {v:'molhada',ic:'💦',t:'Molhada',    s:'Sensação de molhado',   sc:2,lvl:'#f2b705'},
+  {v:'escorr',ic:'✨',t:'Escorregadia',s:'Lubrificante, desliza', sc:3,lvl:'#e5524f'},
+];
+const APP = [
+  {v:'nada', ic:'➖',t:'Nada visível',     s:'Nenhum muco',                 sc:0,lvl:'#2fae7a'},
+  {v:'pega', ic:'🟤',t:'Pegajoso/grumoso', s:'Espesso, esfarela',          sc:1,lvl:'#f2b705'},
+  {v:'cremoso',ic:'🥛',t:'Cremoso',        s:'Branco, opaco',              sc:2,lvl:'#f2b705'},
+  {v:'claro',ic:'🥚',t:'Claro e elástico', s:'Transparente, estica',       sc:3,lvl:'#e5524f'},
+];
+
+function dayScore(rec){ // observação mais fértil do dia
+  if(!rec || !rec.obs) return 0;
+  let m=0;
+  ['manha','noite'].forEach(p=>{
+    const o=rec.obs[p]; if(!o) return;
+    const s=(SENS.find(x=>x.v===o.sens)||{}).sc||0;
+    const a=(APP.find(x=>x.v===o.app)||{}).sc||0;
+    m=Math.max(m,s,a);
+  });
+  return m;
+}
+function hasObs(rec){ return rec && rec.obs && (rec.obs.manha||rec.obs.noite); }
+
+/* ============================================================
+   CICLOS — divide os dias em ciclos a partir do início da menstruação
+   ============================================================ */
+function getRec(d){ return store.days[d]; }
+
+// início de ciclo = primeiro dia de menstruação (>=2) que vem após dia(s) sem menstruação
+function cycleStarts(){
+  const dates = Object.keys(store.days).filter(d=>{
+    const r=store.days[d]; return r && (r.mens>=2 || r.cycleStart);
+  }).sort();
+  const starts=[];
+  dates.forEach(d=>{
+    if(store.days[d].cycleStart){ if(!starts.includes(d)) starts.push(d); return; }
+    const prev=addDays(d,-1);
+    const pr=store.days[prev];
+    if(!pr || !(pr.mens>=2)) starts.push(d);
+  });
+  return [...new Set(starts)].sort();
+}
+
+function buildCycle(start, end){
+  // end exclusivo (próximo início) ou hoje+previsão
+  const days=[];
+  const last = end ? addDays(end,-1) : maxDate();
+  let cur=start, guard=0;
+  while(diffDays(cur,last)>=0 && guard<400){ days.push(cur); cur=addDays(cur,1); guard++; }
+  return {start, days};
+}
+function maxDate(){
+  const ds=Object.keys(store.days).sort();
+  const lastData = ds.length? ds[ds.length-1] : today();
+  return diffDays(today(),lastData)>0 ? lastData : today();
+}
+
+function detectPeak(cycleDays){
+  // Ápice = último dia com score máximo (preferência 3) seguido de queda sustentada
+  // ou marcação manual peak:true
+  for(const d of cycleDays){ if(store.days[d]&&store.days[d].peak) return d; }
+  let best=null, bestScore=0;
+  for(let i=0;i<cycleDays.length;i++){
+    const d=cycleDays[i];
+    const sc=dayScore(getRec(d));
+    if(sc>=2){
+      // queda nos dias seguintes?
+      const nxt = cycleDays.slice(i+1, i+3).map(x=>dayScore(getRec(x)));
+      const dropped = nxt.length>0 && nxt.every(v=>v<sc);
+      if(dropped && sc>=bestScore){ best=d; bestScore=sc; }
+    }
+  }
+  // fallback: maior score do ciclo que não seja o último dia registrado
+  if(!best){
+    for(let i=0;i<cycleDays.length;i++){
+      const sc=dayScore(getRec(cycleDays[i]));
+      if(sc===3 && sc>=bestScore){ best=cycleDays[i]; bestScore=sc; }
+    }
+  }
+  return best;
+}
+
+/* ---------- Classificação de um dia (veredito) ---------- */
+// Dia seco pré-Ápice: aplica a regra dos dias alternados usando o registro de relação
+function dryDayStatus(d){
+  const prev=getRec(addDays(d,-1));
+  if(prev && prev.sex){
+    return {k:'seco',label:'Dia de checagem',avail:false,
+      pill:'⛔ Hoje não — dia de observação',
+      why:'Ontem houve relação: o sêmen pode mascarar o muco hoje. Dia só de observar — se amanhã continuar seca, a noite fica disponível.'};
+  }
+  return {k:'seco',label:'Dia seco',avail:'alt',
+    why:'Antes da ovulação: disponível hoje à noite. (As manhãs não, porque a observação do dia precisa se completar.)'};
+}
+
+function classifyCycle(cyc){
+  const peak = detectPeak(cyc.days);
+  const res={};
+  let startBleed=true;   // ainda dentro do bloco menstrual do início do ciclo
+  let dryRun=0;          // dias consecutivos sem muco e sem sangue (incluindo o atual)
+  let mucusEver=false;   // já houve muco pré-Ápice neste ciclo
+  let lateMucusIdx=-99;  // último dia de muco fértil depois do Ápice+3
+  cyc.days.forEach((d,i)=>{
+    const r=getRec(d);
+    const sc=dayScore(r);
+    const bleeding = !!(r && r.mens>=1);
+    if(bleeding || sc>=1) dryRun=0; else dryRun++;
+    const dp = peak? diffDays(peak,d) : null;
+    let st;
+    if(bleeding){
+      if(startBleed){
+        st={k:'mens',label:'Menstruação',avail:false,
+            why:'O sangramento encobre o muco — trate como possivelmente fértil.'};
+      } else {
+        st={k:'mens',label:'Sangramento fora do período',avail:false,
+            why:'Sangramento no meio do ciclo encobre o muco e pode até acompanhar a ovulação. Tratem como dia fértil; se repetir, conversem com a instrutora.'};
+      }
+    } else if(dp!==null && dp===0){
+      st={k:'fertil',label:'Dia Ápice ⭐',avail:false,peak:true,
+          why:'Último dia escorregadio/elástico. Pico da fertilidade — a ovulação acontece bem perto daqui.'};
+    } else if(dp!==null && dp>=1 && dp<=3){
+      st={k:'fertil',label:`Ápice + ${dp}`,avail:false,
+          why:`${dp}º dia após o Ápice. Ainda fértil pela regra do Ápice (3 dias completos).`};
+    } else if(dp!==null && dp>=4){
+      // fase pós-ovulatória — mas muco fértil que volta exige cautela (pico de retorno)
+      if(sc>=2){
+        lateMucusIdx=i;
+        st={k:'fertil',label:'Atenção: muco voltou',avail:false,
+            why:'Apareceu muco fértil na fase que estava liberada. Sem pânico: evitem hoje e sigam observando. Se durar mais de 2 dias, falem com a instrutora.'};
+      } else if(i-lateMucusIdx<=3){
+        st={k:'fertil',label:`Observando ${i-lateMucusIdx}/3`,avail:false,
+            why:'Aguardando 3 dias sem muco fértil depois do episódio, por segurança.'};
+      } else {
+        st={k:'infertil',label:'Infértil',avail:true,
+            why:'Os 3 dias após o Ápice já passaram. Fase infértil até a próxima menstruação.'};
+      }
+    } else {
+      // antes do Ápice (ou ciclo ainda sem Ápice detectado)
+      if(sc>=1){
+        mucusEver=true;
+        st={k:'fertil',label:'Possível fertilidade',avail:false,
+            why:'Há muco/umidade — a fertilidade pode estar começando. Evitem e sigam observando.'};
+      } else if(mucusEver && dryRun<=3){
+        st={k:'fertil',label:`Secando ${dryRun}/3`,avail:false,
+            why:`Houve muco há pouco. Aguardem 3 dias secos completos antes de voltar às regras dos primeiros dias (dia ${dryRun} de 3).`};
+      } else {
+        st=dryDayStatus(d);
+      }
+    }
+    res[d]=st;
+    startBleed = startBleed && bleeding;
+  });
+  return {peak,res};
+}
+
+/* ---------- Ciclo que contém uma data ---------- */
+function cyclesAll(){
+  const starts=cycleStarts();
+  if(starts.length===0){
+    // sem menstruação registrada ainda: um "pseudo-ciclo" desde o 1º registro
+    const ds=Object.keys(store.days).sort();
+    const start = ds.length? ds[0] : today();
+    return [buildCycle(start,null)];
+  }
+  const out=[];
+  for(let i=0;i<starts.length;i++){
+    out.push(buildCycle(starts[i], starts[i+1]||null));
+  }
+  // dados antes do 1º início
+  const ds=Object.keys(store.days).sort();
+  if(ds.length && diffDays(ds[0],starts[0])>0){
+    out.unshift(buildCycle(ds[0], starts[0]));
+  }
+  return out;
+}
+function cycleOf(date){
+  const all=cyclesAll();
+  for(const c of all){ if(c.days.includes(date)) return c; }
+  // data futura/sem dados -> último ciclo estendido
+  const last=all[all.length-1];
+  if(last) return buildCycle(last.start,null);
+  return buildCycle(date,null);
+}
+
+/* ============================================================
+   RENDER — HOJE
+   ============================================================ */
+function statusMeta(k){
+  return ({
+    mens:{cls:'st-mens',glyph:'🩸'},
+    fertil:{cls:'st-fertil',glyph:'👶'},
+    infertil:{cls:'st-infertil',glyph:'🌿'},
+    seco:{cls:'st-seco',glyph:'🍃'},
+  })[k] || {cls:'st-none',glyph:'🌸'};
+}
+
+function renderHoje(){
+  // segmento de data
+  $('#segToday').textContent = selDate===today() ? 'Hoje' : 'Dia';
+  $$('#dateSeg button').forEach(b=>b.setAttribute('aria-pressed', String(false)));
+  $('#dateLabel').textContent = fmtLong(selDate) + (selDate===today()?' · hoje':'');
+
+  const rec = getRec(selDate) || {};
+  // menstruação
+  $('#mensOpts').innerHTML = MENS.map(m=>`
+    <button class="opt" data-mens="${m.v}" data-sel="${(rec.mens||0)===m.v?1:0}">
+      <span class="dot"></span><span class="ic">${m.ic}</span>
+      <span class="tx"><b>${m.t}</b><span>${m.s}</span></span>
+    </button>`).join('');
+
+  // observação (sensação/aparência) do período atual
+  const o = (rec.obs && rec.obs[curPeriod]) || {};
+  $('#sensOpts').innerHTML = SENS.map(s=>`
+    <button class="opt" data-sens="${s.v}" data-sel="${o.sens===s.v?1:0}">
+      <span class="dot"></span><span class="ic">${s.ic}</span>
+      <span class="tx"><b>${s.t}</b><span>${s.s}</span></span>
+      <span class="lvl" style="background:${s.lvl}">${['seco','baixo','médio','pico'][s.sc]}</span>
+    </button>`).join('');
+  $('#appOpts').innerHTML = APP.map(a=>`
+    <button class="opt" data-app="${a.v}" data-sel="${o.app===a.v?1:0}">
+      <span class="dot"></span><span class="ic">${a.ic}</span>
+      <span class="tx"><b>${a.t}</b><span>${a.s}</span></span>
+      <span class="lvl" style="background:${a.lvl}">${['seco','baixo','médio','pico'][a.sc]}</span>
+    </button>`).join('');
+  $('#saveObs').textContent = curPeriod==='manha' ? 'Salvar observação 🌅' : 'Salvar observação 🌙';
+  // marca período já registrado
+  $$('#periodSeg button').forEach(b=>{
+    const p=b.dataset.period; const done = rec.obs && rec.obs[p];
+    b.setAttribute('aria-pressed', String(p===curPeriod));
+    b.textContent = (p==='manha'?'🌅 Manhã':'🌙 Noite') + (done?' ✓':'');
+  });
+  const both = rec.obs && rec.obs.manha && rec.obs.noite;
+  $('#obsSaved').textContent = both ? '✓ Manhã e noite registradas hoje. Ótimo!' :
+    (rec.obs && (rec.obs.manha||rec.obs.noite) ? '✓ Um período registrado. Falta o outro.' : '');
+
+  // veredito
+  const cyc=cycleOf(selDate);
+  const {peak,res}=classifyCycle(cyc);
+  const st=res[selDate] || {k:'none',label:'Sem dados',why:'Registre a observação do dia.',avail:null};
+  const cd = cyc.days.includes(selDate)? diffDays(cyc.start,selDate)+1 : '–';
+  const meta=statusMeta(st.k);
+  let availTxt = st.pill || (st.avail===true?'✅ Disponível' : st.avail==='alt'?'🌙 Disponível hoje à noite' : st.avail===false?'⛔ Evitar (fértil)' : '');
+  $('#statusBanner').innerHTML = `
+    <div class="status ${meta.cls}">
+      <div class="glyph">${meta.glyph}</div>
+      <div class="kcycle">Dia ${cd} do ciclo</div>
+      <div class="verdict">${st.label}</div>
+      <div class="desc">${st.why}</div>
+      ${availTxt?`<span class="pill">${availTxt}</span>`:''}
+    </div>`;
+
+  // card de ápice
+  const sc=dayScore(rec);
+  const isPeak = store.days[selDate] && store.days[selDate].peak;
+  if(hasObs(rec) || isPeak){
+    $('#peakCard').style.display='block';
+    $('#peakHint').textContent = isPeak
+      ? 'Este dia está marcado como Ápice. Os 3 dias seguintes continuam férteis.'
+      : (sc>=2 ? 'Hoje teve sensação fértil. Se amanhã secar, hoje foi seu Ápice — confirme aqui depois.'
+              : (peak ? 'O Ápice deste ciclo já foi detectado automaticamente. Ajuste se precisar.'
+                      : 'Quando o muco escorregadio/elástico parar, marque o último dia como Ápice.'));
+  } else {
+    $('#peakCard').style.display='none';
+  }
+
+  $('#sexBtn').dataset.sel = rec.sex? '1':'0';
+  $('#noteInp').value = rec.note||'';
+
+  // previsão resumida (só com 1+ ciclo completo)
+  const stp=cycleStats();
+  if(stp.avgLen){
+    const allc=cyclesAll(); const curc=allc[allc.length-1];
+    const peakDay=Math.round(stp.avgPeak||stp.avgLen-14);
+    $('#miniPred').style.display='block';
+    $('#miniPred').innerHTML=`<h2>📅 De olho no calendário</h2>
+      <p class="sub" style="margin:6px 0 0">👶 Janela fértil estimada: <b>${fmtShort(addDays(curc.start,Math.max(0,peakDay-7)))} – ${fmtShort(addDays(curc.start,peakDay+3))}</b><br>
+      🩸 Próxima menstruação: por volta de <b>${fmtShort(addDays(curc.start,stp.avgLen))}</b><br>
+      <span class="muted">Estimativa pelos ciclos anteriores — a observação do dia sempre manda.</span></p>`;
+  } else $('#miniPred').style.display='none';
+
+  renderStreak();
+}
+
+function renderStreak(){
+  let n=0, d=today();
+  while(hasObs(getRec(d)) || (getRec(d)&&getRec(d).mens>=1)){ n++; d=addDays(d,-1); }
+  if(n>(store.best||0)){ store.best=n; save(); }
+  $('#streakN').textContent = n+(n===1?' dia':' dias');
+  const rec = (store.best||0)>n ? ` Seu recorde é ${store.best} dias — dá para alcançar! 🏆` : (n>=3?' Recorde pessoal! 🏆':'');
+  $('#streakMsg').textContent = (n>=7?'Que consistência! O padrão está cada vez mais claro.'
+    : n>=3?'Hábito se formando. Continuem assim 💪'
+    : 'Cada anotação aumenta a confiança no método.')+rec;
+}
+
+/* ============================================================
+   RENDER — CICLO (roda + tira)
+   ============================================================ */
+const COLOR={mens:'var(--mens)',fertil:'var(--fertil)',infertil:'var(--infertil)',seco:'var(--seco)',none:'#e9dfe2'};
+const COLORHEX={mens:'#e5524f',fertil:'#f2b705',infertil:'#2fae7a',seco:'#6aa9d6',none:'#e9dfe2'};
+
+let cycIdx=null; // null = ciclo atual
+function viewedCycle(){
+  const all=cyclesAll();
+  if(cycIdx===null || cycIdx>=all.length-1){ cycIdx=null; return all[all.length-1]; }
+  if(cycIdx<0) cycIdx=0;
+  return all[cycIdx];
+}
+function renderCiclo(){
+  const cyc=viewedCycle();
+  $('#cycTitle').textContent = cycIdx===null? 'Ciclo atual' : 'Ciclo de '+fmtShort(cyc.start);
+  const {peak,res}=classifyCycle(cyc);
+  const len=cyc.days.length;
+  $('#cicloSub').textContent = `Início ${fmtLong(cyc.start)} · ${len} dia(s) registrados`+(peak?` · Ápice no dia ${diffDays(cyc.start,peak)+1}`:'');
+
+  // ----- Roda SVG -----
+  const N=Math.max(len, 28);
+  const cx=150,cy=150,rOut=130,rIn=86;
+  let segs='';
+  cyc.days.forEach((d,i)=>{
+    const st=res[d]||{k:'none'};
+    const a0=(i/N)*2*Math.PI - Math.PI/2;
+    const a1=((i+1)/N)*2*Math.PI - Math.PI/2;
+    segs+=arc(cx,cy,rIn,rOut,a0,a1,COLORHEX[st.k]||COLORHEX.none, d===today());
+    if(st.peak){
+      const am=(a0+a1)/2, px=cx+(rOut+12)*Math.cos(am), py=cy+(rOut+12)*Math.sin(am);
+      segs+=`<text x="${px}" y="${py}" font-size="14" text-anchor="middle" dominant-baseline="middle">⭐</text>`;
+    }
+  });
+  const cd = cyc.days.includes(today())? diffDays(cyc.start,today())+1 : len;
+  $('#wheel').innerHTML=`<svg class="wheel" viewBox="0 0 300 300">
+    ${segs}
+    <text x="150" y="138" text-anchor="middle" font-size="42" font-weight="800" fill="#c75b7a">${cd}</text>
+    <text x="150" y="166" text-anchor="middle" font-size="13" fill="#7a6b72">dia do ciclo</text>
+  </svg>`;
+
+  // ----- Tira -----
+  $('#strip').innerHTML = cyc.days.map(d=>{
+    const st=res[d]||{k:'none'};
+    const r=getRec(d)||{};
+    let glyph = st.k==='mens'?'🩸':st.k==='fertil'?'👶':st.k==='infertil'?'🌿':st.k==='seco'?'🍃':'·';
+    const dp = peak? diffDays(peak,d):null;
+    const peakBadge = st.peak?'<span class="peak">P</span>': (dp>=1&&dp<=3?`<span class="peak">${dp}</span>`:'');
+    const dt=new Date(d+'T00:00');
+    const sexMark = r.sex?'<span style="position:absolute;bottom:-5px;right:-5px;font-size:11px">💗</span>':'';
+    const noteMark = r.note?'<span style="position:absolute;top:-5px;left:-5px;font-size:9px" title="'+String(r.note).replace(/"/g,'&quot;')+'">📝</span>':'';
+    return `<div class="cell ${d===today()?'today':''}" data-jump="${d}">
+      <div class="stamp" style="background:${tint(st.k)};color:${COLORHEX[st.k]}">${glyph}${peakBadge}${sexMark}${noteMark}</div>
+      <div class="d">${dt.getDate()}</div>
+      <div class="dd">${['D','S','T','Q','Q','S','S'][dt.getDay()]}</div>
+    </div>`;
+  }).join('');
+  // auto-scroll para hoje
+  setTimeout(()=>{ const t=$('#strip .today'); if(t) t.scrollIntoView({inline:'center',block:'nearest'}); },30);
+
+  renderPrediction();
+}
+function tint(k){ return {mens:'#fde3e2',fertil:'#fef3d3',infertil:'#d9f3e8',seco:'#e2eff9',none:'#f6eef0'}[k]||'#f6eef0'; }
+
+function arc(cx,cy,r0,r1,a0,a1,color,today){
+  const p=(r,a)=>[cx+r*Math.cos(a),cy+r*Math.sin(a)];
+  const [x0,y0]=p(r1,a0),[x1,y1]=p(r1,a1),[x2,y2]=p(r0,a1),[x3,y3]=p(r0,a0);
+  const large=(a1-a0)>Math.PI?1:0;
+  return `<path d="M${x0} ${y0} A${r1} ${r1} 0 ${large} 1 ${x1} ${y1} L${x2} ${y2} A${r0} ${r0} 0 ${large} 0 ${x3} ${y3} Z"
+    fill="${color}" stroke="${today?'#c75b7a':'#fff'}" stroke-width="${today?2.5:1.5}"/>`;
+}
+
+function renderPrediction(){
+  const stats=cycleStats();
+  const all=cyclesAll(); const cyc=all[all.length-1]; // previsão sempre sobre o ciclo atual
+  if(stats.n<1 || !stats.avgLen){
+    $('#prediction').innerHTML=`<div class="note">Registre pelo menos 1 ciclo completo (de menstruação a menstruação) para a previsão aparecer. Por enquanto, confie na observação diária.</div>`;
+    return;
+  }
+  const peakDay = Math.round(stats.avgPeak||stats.avgLen-14);
+  const fStart=addDays(cyc.start, Math.max(0,peakDay-7));
+  const fEnd=addDays(cyc.start, peakDay+3);
+  const nextMens=addDays(cyc.start, Math.round(stats.avgLen));
+  $('#prediction').innerHTML=`
+    <div class="note" style="background:#fef3d3;border-color:#f4e2a0;color:#8a6400">
+      <b>👶 Janela fértil estimada:</b> ${fmtShort(fStart)} a ${fmtShort(fEnd)}.<br>
+      Evite relações sem proteção neste período (estimativa — o muco manda).
+    </div>
+    <div class="note" style="margin-top:8px">
+      <b>🩸 Próxima menstruação (estimada):</b> por volta de ${fmtShort(nextMens)}.
+    </div>`;
+}
+function fmtShort(s){ const d=new Date(s+'T00:00'); const m=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez']; return `${d.getDate()}/${m[d.getMonth()]}`; }
+
+/* ============================================================
+   RENDER — HISTÓRICO
+   ============================================================ */
+function cycleStats(){
+  const starts=cycleStarts();
+  const lens=[], peaks=[];
+  for(let i=0;i<starts.length;i++){
+    const end=starts[i+1];
+    if(!end) continue; // ciclo incompleto
+    lens.push(diffDays(starts[i],end));
+    const cyc=buildCycle(starts[i],end);
+    const pk=detectPeak(cyc.days);
+    if(pk) peaks.push(diffDays(starts[i],pk)+1);
+  }
+  const avg=arr=>arr.length?Math.round(arr.reduce((a,b)=>a+b,0)/arr.length):null;
+  return {n:starts.length, complete:lens.length, avgLen:avg(lens), avgPeak:avg(peaks), lens, peaks, starts};
+}
+
+function renderHist(){
+  const s=cycleStats();
+  $('#stCycles').textContent=s.n;
+  $('#stAvg').textContent=s.avgLen?s.avgLen+'d':'–';
+  $('#stPeak').textContent=s.avgPeak?'dia '+s.avgPeak:'–';
+
+  const all=cyclesAll().slice().reverse();
+  if(all.length===0 || (all.length===1 && all[0].days.every(d=>!getRec(d)))){
+    $('#histList').innerHTML=`<div class="empty"><div class="e">📊</div>Ainda sem ciclos registrados.<br>Comece marcando a menstruação na aba <b>Hoje</b>.</div>`;
+    return;
+  }
+  $('#histList').innerHTML=all.map((c,idx)=>{
+    const {peak,res}=classifyCycle(c);
+    const len=c.days.length;
+    const bar=c.days.map(d=>{const st=res[d]||{k:'none'};return `<i style="background:${COLORHEX[st.k]};width:${100/len}%"></i>`;}).join('');
+    const pkTxt=peak?`Ápice dia ${diffDays(c.start,peak)+1}`:'Ápice não detectado';
+    return `<div class="hist-item">
+      <div style="min-width:64px"><b style="font-size:13px">${fmtShort(c.start)}</b><br><span class="muted">${len} dias</span></div>
+      <div class="bar">${bar}</div>
+      <div style="min-width:74px;text-align:right" class="muted">${pkTxt}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ============================================================
+   INTERAÇÕES — HOJE
+   ============================================================ */
+$('#mensOpts').addEventListener('click',e=>{
+  const b=e.target.closest('[data-mens]'); if(!b)return;
+  if(isFuture(selDate)){ toast('Não dá para registrar o futuro 😉'); return; }
+  const v=+b.dataset.mens;
+  const rec=getRec(selDate)||{};
+  rec.mens=v; rec.u=Date.now();
+  store.days[selDate]=rec; save();
+  if(v>=2) toast('Menstruação registrada 🩸');
+  renderHoje(); renderCiclo();
+});
+$('#periodSeg').addEventListener('click',e=>{
+  const b=e.target.closest('[data-period]'); if(!b)return;
+  curPeriod=b.dataset.period; renderHoje();
+});
+let pendSens=null, pendApp=null;
+$('#sensOpts').addEventListener('click',e=>{
+  const b=e.target.closest('[data-sens]'); if(!b)return;
+  $$('#sensOpts .opt').forEach(o=>o.dataset.sel='0'); b.dataset.sel='1'; pendSens=b.dataset.sens;
+});
+$('#appOpts').addEventListener('click',e=>{
+  const b=e.target.closest('[data-app]'); if(!b)return;
+  $$('#appOpts .opt').forEach(o=>o.dataset.sel='0'); b.dataset.sel='1'; pendApp=b.dataset.app;
+});
+$('#saveObs').addEventListener('click',()=>{
+  if(isFuture(selDate)){ toast('Não dá para registrar o futuro 😉'); return; }
+  const rec=getRec(selDate)||{};
+  rec.obs=rec.obs||{};
+  const existing=rec.obs[curPeriod]||{};
+  const sens=pendSens|| existing.sens || $('#sensOpts .opt[data-sel="1"]')?.dataset.sens;
+  const app=pendApp|| existing.app || $('#appOpts .opt[data-sel="1"]')?.dataset.app;
+  if(!sens && !app){ toast('Escolha ao menos a sensação'); return; }
+  rec.obs[curPeriod]={sens:sens||'seca', app:app||'nada'};
+  rec.u=Date.now();
+  store.days[selDate]=rec; save();
+  pendSens=pendApp=null;
+  toast(curPeriod==='manha'?'Manhã registrada 🌅':'Noite registrada 🌙');
+  // alterna automaticamente para o período que falta
+  if(curPeriod==='manha' && !(rec.obs.noite)) curPeriod='noite';
+  renderHoje(); renderCiclo();
+});
+$('#peakConfirm').addEventListener('click',()=>{
+  // limpa outros ápices do ciclo
+  const cyc=cycleOf(selDate);
+  cyc.days.forEach(d=>{ if(store.days[d]) delete store.days[d].peak; });
+  const rec=getRec(selDate)||{}; rec.peak=true; rec.u=Date.now(); store.days[selDate]=rec; save();
+  toast('Dia Ápice confirmado ⭐'); renderHoje(); renderCiclo();
+});
+$('#peakClear').addEventListener('click',()=>{
+  if(store.days[selDate]){ delete store.days[selDate].peak; store.days[selDate].u=Date.now(); } save();
+  toast('Marcação de Ápice removida'); renderHoje(); renderCiclo();
+});
+$('#sexBtn').addEventListener('click',()=>{
+  if(isFuture(selDate)){ toast('Não dá para registrar o futuro 😉'); return; }
+  const rec=getRec(selDate)||{};
+  rec.sex=!rec.sex; if(!rec.sex) delete rec.sex;
+  rec.u=Date.now(); store.days[selDate]=rec; save();
+  toast(rec.sex?'Relação registrada 💞':'Registro de relação removido');
+  renderHoje(); renderCiclo();
+});
+$('#noteInp').addEventListener('change',()=>{
+  const rec=getRec(selDate)||{};
+  rec.note=$('#noteInp').value.trim(); if(!rec.note) delete rec.note;
+  rec.u=Date.now(); store.days[selDate]=rec; save();
+  toast('Anotação salva 📝');
+});
+$('#clearDay').addEventListener('click',()=>{
+  if(!confirm('Limpar todos os registros deste dia?')) return;
+  store.days[selDate]={u:Date.now()}; save();
+  toast('Dia limpo 🧽'); renderHoje(); renderCiclo();
+});
+function isFuture(d){ return diffDays(today(),d)>0; }
+$('#dateSeg').addEventListener('click',e=>{
+  const b=e.target.closest('[data-shift]'); if(!b)return;
+  const sh=+b.dataset.shift;
+  selDate = sh===0?today():addDays(selDate,sh);
+  curPeriod='manha';
+  renderHoje();
+});
+
+/* ============================================================
+   NAVEGAÇÃO
+   ============================================================ */
+$$('nav.tabs button').forEach(b=>b.addEventListener('click',()=>{
+  const v=b.dataset.view;
+  $$('nav.tabs button').forEach(x=>x.setAttribute('aria-current','false'));
+  b.setAttribute('aria-current','true');
+  $$('.view').forEach(x=>x.classList.remove('active'));
+  $('#v-'+v).classList.add('active');
+  if(v==='ciclo') renderCiclo();
+  if(v==='hist') renderHist();
+  window.scrollTo({top:0,behavior:'smooth'});
+}));
+$('#cycPrev').addEventListener('click',()=>{
+  const all=cyclesAll(); const cur = cycIdx===null? all.length-1 : cycIdx;
+  cycIdx=Math.max(0,cur-1); renderCiclo();
+});
+$('#cycNext').addEventListener('click',()=>{
+  const all=cyclesAll(); const cur = cycIdx===null? all.length-1 : cycIdx;
+  cycIdx = (cur+1>=all.length-1)? null : cur+1; renderCiclo();
+});
+$('#cycCur').addEventListener('click',()=>{ cycIdx=null; renderCiclo(); });
+$('#strip').addEventListener('click',e=>{
+  const c=e.target.closest('[data-jump]'); if(!c)return;
+  selDate=c.dataset.jump; curPeriod='manha';
+  $$('nav.tabs button').forEach(x=>x.setAttribute('aria-current', x.dataset.view==='hoje'?'true':'false'));
+  $$('.view').forEach(x=>x.classList.remove('active')); $('#v-hoje').classList.add('active');
+  renderHoje(); window.scrollTo({top:0,behavior:'smooth'});
+});
+
+/* ============================================================
+   CONFIG — lembretes, backup, reset
+   ============================================================ */
+$('#dlIcs').addEventListener('click',()=>{
+  const m=$('#remMorning').value||'08:00', n=$('#remNight').value||'21:30';
+  const ics=buildICS(m,n);
+  download('lembretes-billings.ics', ics, 'text/calendar');
+  toast('Abra o arquivo para adicionar ao calendário 📅');
+});
+function buildICS(m,n){
+  const [mh,mm]=m.split(':'), [nh,nm]=n.split(':');
+  const stamp='20240101T000000Z';
+  function ev(uid,h,mi,title,desc){
+    return ['BEGIN:VEVENT',`UID:${uid}@meuciclo`,`DTSTAMP:${stamp}`,
+      `DTSTART:20240101T${h}${mi}00`,'RRULE:FREQ=DAILY',
+      `SUMMARY:${title}`,`DESCRIPTION:${desc}`,
+      'BEGIN:VALARM','TRIGGER:PT0M','ACTION:DISPLAY',`DESCRIPTION:${title}`,'END:VALARM',
+      'END:VEVENT'].join('\r\n');
+  }
+  return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//MeuCiclo//Billings//PT','CALSCALE:GREGORIAN',
+    ev('mc-manha',mh.padStart(2,'0'),mm,'🌅 Billings: anotar sensação (manhã)','Registre a observação da manhã no app Meu Ciclo.'),
+    ev('mc-noite',nh.padStart(2,'0'),nm,'🌙 Billings: anotar sensação (noite)','Registre a observação mais fértil do dia no app Meu Ciclo.'),
+    'END:VCALENDAR'].join('\r\n');
+}
+$('#notifBtn').addEventListener('click', async ()=>{
+  if(!('Notification' in window)){ toast('Notificações não suportadas aqui'); return; }
+  const p=await Notification.requestPermission();
+  if(p==='granted'){ scheduleNotif(); toast('Notificações ativadas 🔔'); new Notification('Meu Ciclo','Tudo certo! Vou lembrar de manhã e à noite.'); }
+  else toast('Permissão negada');
+});
+function scheduleNotif(){
+  // só funciona com app aberto; calendário (.ics) é o método confiável
+  if(Notification.permission!=='granted')return;
+  const times=[$('#remMorning').value,$('#remNight').value];
+  setInterval(()=>{
+    const now=new Date(); const hm=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+    if(times.includes(hm) && now.getSeconds()<30){
+      new Notification('🌸 Meu Ciclo', {body:'Hora de anotar a sensação no app.'});
+    }
+  },30000);
+}
+function mergeStore(inc){
+  if(!inc || typeof inc.days!=='object') return -1;
+  let changed=0;
+  for(const d in inc.days){
+    const a=store.days[d], b=inc.days[d];
+    if(!a || (b.u||0)>(a.u||0)){ store.days[d]=b; changed++; }
+  }
+  store.seen=true; save(); return changed;
+}
+$('#syncSend').addEventListener('click', async ()=>{
+  const data=JSON.stringify(store,null,1);
+  const name=`meu-ciclo-${today()}.json`;
+  const file=new File([data], name, {type:'application/json'});
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    try{
+      await navigator.share({files:[file], title:'Meu Ciclo', text:'Registros do Meu Ciclo 🌸'});
+      toast('Enviado 📤'); return;
+    }catch(err){ if(err && err.name==='AbortError') return; }
+  }
+  download(name, data, 'application/json');
+  toast('Arquivo baixado — envie pelo WhatsApp 📤');
+});
+$('#syncRecv').addEventListener('click',()=>$('#importFile').click());
+$('#importFile').addEventListener('change',e=>{
+  const f=e.target.files[0]; if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const n=mergeStore(JSON.parse(r.result));
+      if(n<0){ toast('Arquivo inválido'); return; }
+      toast(n>0?`✓ ${n} dia(s) atualizados`:'✓ Já estava tudo em dia');
+      renderAll();
+    }catch(_){ toast('Arquivo inválido'); }
+  };
+  r.readAsText(f);
+  e.target.value='';
+});
+$('#forceStart').addEventListener('click',()=>{
+  const rec=getRec(selDate)||{}; rec.cycleStart=true; if(!rec.mens)rec.mens=2; rec.u=Date.now(); store.days[selDate]=rec; save();
+  toast('Início de ciclo marcado'); renderAll();
+});
+$('#resetBtn').addEventListener('click',()=>{
+  if(confirm('Apagar TODOS os dados deste aparelho? Esta ação não pode ser desfeita.')){
+    store={days:{},seen:true}; save(); toast('Dados apagados'); selDate=today(); renderAll();
+  }
+});
+$('#howto').addEventListener('click',()=>{ obStep=0; showOnb(); });
+$('#pinSet').addEventListener('click',()=>{
+  const p=prompt('Escolha um PIN de 4 números:');
+  if(p===null) return;
+  if(!/^\d{4}$/.test(p)){ toast('Use exatamente 4 números'); return; }
+  store.pin=p; save(); toast('PIN definido 🔒');
+});
+$('#pinOff').addEventListener('click',()=>{
+  if(store.pin===undefined){ toast('Nenhum PIN definido'); return; }
+  delete store.pin; save(); toast('PIN removido');
+});
+function checkLock(){
+  if(!store.pin) return;
+  const lock=$('#lock'), inp=$('#pinInp');
+  lock.style.display='flex';
+  setTimeout(()=>inp.focus(),150);
+  inp.addEventListener('input',()=>{
+    if(inp.value.length<4){ $('#pinErr').textContent=''; return; }
+    if(inp.value===store.pin){ lock.style.display='none'; inp.value=''; }
+    else { $('#pinErr').textContent='PIN incorreto'; inp.value=''; }
+  });
+}
+
+/* ============================================================
+   UTILS
+   ============================================================ */
+function download(name,content,type){
+  const blob=new Blob([content],{type}); const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+let toastT;
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2200); }
+
+function renderAll(){ renderHoje(); renderCiclo(); renderHist(); }
+
+/* ============================================================
+   ONBOARDING
+   ============================================================ */
+const OB=[
+  {ic:'🌸',t:'Bem-vinda ao Meu Ciclo',x:'Um app simples e privado para viverem juntos o Método Billings. Tudo fica só neste celular.'},
+  {ic:'📝',t:'Anote de manhã e à noite',x:'Duas vezes por dia você registra a sensação e a aparência do muco. O app cuida do resto.'},
+  {ic:'⭐',t:'O app encontra o Ápice',x:'Ele identifica o dia mais fértil (o Pico) e aplica a regra do Ápice + 3 para você.'},
+  {ic:'🚦',t:'Veredito claro todo dia',x:'Verde = infértil (disponível). Amarelo = fértil (evitar). Sem adivinhação — na dúvida, ele avisa para esperar.'},
+  {ic:'📅',t:'Lembretes no calendário',x:'Em Ajustes, baixe os lembretes para tocarem todo dia. E adicione o app à tela inicial.'},
+  {ic:'💛',t:'Confiança vem com o hábito',x:'Após 2–3 ciclos o padrão fica claro. Façam acompanhamento com um instrutor Billings para segurança total.'},
+];
+let obStep=0;
+function showOnb(){ $('#onb').classList.add('show'); paintOb(); }
+function paintOb(){
+  const s=OB[obStep];
+  $('#obIc').textContent=s.ic; $('#obTitle').textContent=s.t; $('#obText').textContent=s.x;
+  $('#obDots').innerHTML=OB.map((_,i)=>`<i class="${i===obStep?'on':''}"></i>`).join('');
+  $('#obNext').textContent = obStep===OB.length-1?'Começar 🌸':'Continuar';
+}
+$('#obNext').addEventListener('click',()=>{
+  if(obStep<OB.length-1){ obStep++; paintOb(); }
+  else { $('#onb').classList.remove('show'); store.seen=true; save(); }
+});
+$('#obSkip').addEventListener('click',()=>{ $('#onb').classList.remove('show'); store.seen=true; save(); });
+
+/* ============================================================
+   INIT
+   ============================================================ */
+renderAll();
+checkLock();
+if(!store.seen) showOnb();
+// PWA: funciona offline depois de instalado (precisa de https ou localhost)
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>
