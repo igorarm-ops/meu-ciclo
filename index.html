@@ -372,11 +372,14 @@
   <section id="v-config" class="view">
     <div class="card">
       <h2>⏰ Lembretes</h2>
-      <p class="sub">Só dois avisos por dia, sem spam: de <b>manhã</b>, um toque suave para ela <b>começar a reparar</b> nas sensações; à <b>noite</b>, o lembrete de <b>fazer a anotação do dia</b>. Tocam todo dia, mesmo com o app fechado.</p>
+      <p class="sub">Dois avisos por dia, sem virar spam. De <b>manhã</b>, um toque suave para ela <b>começar a reparar</b> — com <b>mensagem e horário diferentes a cada dia</b>, dentro da faixa que você escolher. À <b>noite</b>, o lembrete fixo de <b>fazer a anotação</b>. Tocam todo dia, mesmo com o app fechado.</p>
+      <label class="fld">Manhã · aviso para reparar (o horário sorteia dentro desta faixa)</label>
       <div class="grid2">
-        <div><label class="fld">Manhã · reparar</label><input type="time" id="remMorning" value="08:00"></div>
-        <div><label class="fld">Noite · anotar</label><input type="time" id="remNight" value="21:30"></div>
+        <div><label class="fld" style="margin-top:2px">De</label><input type="time" id="remMorningStart" value="07:00"></div>
+        <div><label class="fld" style="margin-top:2px">Até</label><input type="time" id="remMorningEnd" value="09:30"></div>
       </div>
+      <label class="fld">Noite · lembrete de anotar (sempre no mesmo horário)</label>
+      <input type="time" id="remNight" value="21:30">
       <button class="btn btn-primary" id="dlIcs" style="margin-top:14px">📅 Baixar lembretes (.ics)</button>
       <button class="btn btn-line" id="notifBtn" style="margin-top:8px;width:100%">🔔 Ativar notificação enquanto o app estiver aberto</button>
       <p class="muted" style="margin-top:10px">Dica: abra este app no celular dela e use “Adicionar à tela inicial” para ficar como um aplicativo.</p>
@@ -1018,26 +1021,59 @@ $('#strip').addEventListener('click',e=>{
 /* ============================================================
    CONFIG — lembretes, backup, reset
    ============================================================ */
+// Avisos da manhã: pool de frases variadas (rotacionam por dia, sem virar spam)
+const MORNING_MSGS=[
+  '🌸 Bom dia! Repare de leve nas sensacoes hoje',
+  '💛 Oi! So preste atencao no que o corpo sente hoje',
+  '🌷 Bom dia! Um olhar carinhoso pro seu corpo hoje',
+  '🌿 Lembrete fofo: observe as sensacoes ao longo do dia',
+  '💫 So passando pra lembrar de reparar no corpo hoje',
+  '🤍 Hoje e dia de se observar com carinho',
+  '🌅 Bom dia! Atencao leve as sensacoes, sem pressa',
+  '🌸 Um respiro e um olhar pro corpo hoje',
+  '💛 Bom dia! Seu corpo fala — escute as sensacoes',
+  '🌙 Sentir e reparar de dia. Anotar, so a noite',
+  '🌻 Bom dia! Fique de olho nas sensacoes de hoje',
+  '✨ Comece o dia atenta ao corpo, com leveza',
+  '🌼 Oi! Hoje, repare nas sensacoes quando lembrar',
+  '💗 Bom dia! Um carinho de atencao pro seu corpo'
+];
+function dayHash(s){ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; }
+function dayNum(d){ return diffDays('2020-01-01', d); }
+function morningTimeFor(d,startMin,endMin){ const span=Math.max(1,endMin-startMin); return startMin + (dayHash(d+'|t') % span); }
+// rotação por passo coprimo (5 e 14): cada frase aparece 1x por ciclo, sem repetir em dias seguidos
+function morningMsgFor(d){ const L=MORNING_MSGS.length; return MORNING_MSGS[(((dayNum(d)*5)%L)+L)%L]; }
+function icsEsc(s){ return String(s).replace(/([\\;,])/g,'\\$1').replace(/\n/g,'\\n'); }
+
 $('#dlIcs').addEventListener('click',()=>{
-  const m=$('#remMorning').value||'08:00', n=$('#remNight').value||'21:30';
-  const ics=buildICS(m,n);
-  download('lembretes-billings.ics', ics, 'text/calendar');
+  const ms=$('#remMorningStart').value||'07:00', me=$('#remMorningEnd').value||'09:30', n=$('#remNight').value||'21:30';
+  download('lembretes-billings.ics', buildICS(ms,me,n), 'text/calendar');
   toast('Abra o arquivo para adicionar ao calendário 📅');
 });
-function buildICS(m,n){
-  const [mh,mm]=m.split(':'), [nh,nm]=n.split(':');
+function buildICS(ms,me,n){
+  const [sh,sm]=ms.split(':').map(Number), [eh,em]=me.split(':').map(Number);
+  const startMin=sh*60+sm, endMin=Math.max(startMin+1, eh*60+em);
+  const [nh,nm]=n.split(':');
   const stamp='20240101T000000Z';
-  function ev(uid,h,mi,title,desc){
-    return ['BEGIN:VEVENT',`UID:${uid}@meuciclo`,`DTSTAMP:${stamp}`,
-      `DTSTART:20240101T${h}${mi}00`,'RRULE:FREQ=DAILY',
-      `SUMMARY:${title}`,`DESCRIPTION:${desc}`,
-      'BEGIN:VALARM','TRIGGER:PT0M','ACTION:DISPLAY',`DESCRIPTION:${title}`,'END:VALARM',
-      'END:VEVENT'].join('\r\n');
+  const L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//MeuCiclo//Billings//PT','CALSCALE:GREGORIAN'];
+  // Manhã: 1 evento por dia (1 ano), horário e mensagem variados
+  for(let i=0;i<365;i++){
+    const d=addDays(today(),i), ymd=d.replace(/-/g,'');
+    const t=morningTimeFor(d,startMin,endMin);
+    const hh=String(Math.floor(t/60)).padStart(2,'0'), mi=String(t%60).padStart(2,'0');
+    L.push('BEGIN:VEVENT',`UID:mc-m-${d}@meuciclo`,`DTSTAMP:${stamp}`,
+      `DTSTART:${ymd}T${hh}${mi}00`,`SUMMARY:${icsEsc(morningMsgFor(d))}`,
+      'DESCRIPTION:'+icsEsc('So um lembrete para reparar nas sensacoes hoje. A anotacao e a noite, uma so.'),
+      'BEGIN:VALARM','TRIGGER:PT0M','ACTION:DISPLAY','DESCRIPTION:Meu Ciclo','END:VALARM','END:VEVENT');
   }
-  return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//MeuCiclo//Billings//PT','CALSCALE:GREGORIAN',
-    ev('mc-manha',mh.padStart(2,'0'),mm,'🌸 Billings: repare nas sensacoes hoje','So um lembrete para comecar a prestar atencao na sensacao ao longo do dia. A anotacao e a noite, uma so.'),
-    ev('mc-noite',nh.padStart(2,'0'),nm,'🌙 Billings: anotar a observacao do dia','Registre no app Meu Ciclo a sensacao mais fertil que voce teve hoje. Uma anotacao por dia.'),
-    'END:VCALENDAR'].join('\r\n');
+  // Noite: recorrente fixo (a tarefa real — consistência ajuda)
+  L.push('BEGIN:VEVENT',`UID:mc-noite@meuciclo`,`DTSTAMP:${stamp}`,
+    `DTSTART:20240101T${nh.padStart(2,'0')}${nm}00`,'RRULE:FREQ=DAILY',
+    'SUMMARY:'+icsEsc('🌙 Billings: anotar a observacao do dia'),
+    'DESCRIPTION:'+icsEsc('Registre no app a sensacao mais fertil que voce teve hoje. Uma anotacao por dia.'),
+    'BEGIN:VALARM','TRIGGER:PT0M','ACTION:DISPLAY','DESCRIPTION:Meu Ciclo','END:VALARM','END:VEVENT');
+  L.push('END:VCALENDAR');
+  return L.join('\r\n');
 }
 $('#notifBtn').addEventListener('click', async ()=>{
   if(!('Notification' in window)){ toast('Notificações não suportadas aqui'); return; }
@@ -1050,10 +1086,15 @@ function scheduleNotif(){
   if(Notification.permission!=='granted')return;
   let lastFired='';
   setInterval(()=>{
-    const m=$('#remMorning').value, n=$('#remNight').value;
+    const ms=$('#remMorningStart').value||'07:00', me=$('#remMorningEnd').value||'09:30', n=$('#remNight').value||'21:30';
+    const [sh,sm]=ms.split(':').map(Number),[eh,em]=me.split(':').map(Number);
+    const startMin=sh*60+sm, endMin=Math.max(startMin+1, eh*60+em);
+    const td=today();
+    const mt=morningTimeFor(td,startMin,endMin);
+    const mhm=String(Math.floor(mt/60)).padStart(2,'0')+':'+String(mt%60).padStart(2,'0');
     const now=new Date(); const hm=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
     if(hm===lastFired) return; // evita repetir no mesmo minuto (sem spam)
-    if(hm===m){ lastFired=hm; new Notification('🌸 Meu Ciclo',{body:'Comece a reparar nas sensações hoje. A anotação é só à noite.'}); }
+    if(hm===mhm){ lastFired=hm; new Notification('Meu Ciclo',{body:morningMsgFor(td)}); }
     else if(hm===n){ lastFired=hm; new Notification('🌙 Meu Ciclo',{body:'Hora de anotar a observação do dia — uma só.'}); }
   },20000);
 }
