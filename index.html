@@ -203,6 +203,7 @@
   <!-- ===================== HOJE ===================== -->
   <section id="v-hoje" class="view active">
     <div id="statusBanner"></div>
+    <div id="backupBanner"></div>
 
     <div class="card">
       <div class="seg" id="dateSeg" style="margin-bottom:4px">
@@ -393,7 +394,15 @@
         <button class="btn btn-ghost" id="syncRecv" style="flex:1">📥 Receber</button>
         <input type="file" id="importFile" accept="application/json,.json" style="display:none">
       </div>
-      <p class="muted" style="margin-top:10px">O arquivo também serve de backup. Os dados só saem do aparelho quando você mesma envia.</p>
+      <p class="muted" id="bkInfo" style="margin-top:10px"></p>
+    </div>
+
+    <div class="card">
+      <h2>🛟 Cópias automáticas</h2>
+      <p class="sub">Todo dia o app guarda sozinho uma cópia interna (últimos 30 dias). Se algo for apagado por engano, é só restaurar de um dia anterior.</p>
+      <select id="snapSelect"></select>
+      <button class="btn btn-line" id="snapRestore" style="width:100%;margin-top:10px">Restaurar a cópia escolhida</button>
+      <p class="muted" style="margin-top:8px">Atenção: isso protege contra erros dentro do app, mas <b>não</b> contra trocar de celular ou limpar o navegador — para isso, use o backup (Enviar) acima.</p>
     </div>
 
     <div class="card">
@@ -471,7 +480,19 @@ function load(){
   try{ return JSON.parse(localStorage.getItem(KEY)) || {days:{}, seen:false}; }
   catch(e){ return {days:{}, seen:false}; }
 }
-function save(){ localStorage.setItem(KEY, JSON.stringify(store)); }
+function save(){ localStorage.setItem(KEY, JSON.stringify(store)); autoSnapshot(); }
+
+/* ---------- Cópias automáticas internas (últimos 30 dias) ---------- */
+const SNAPKEY='billings_snaps';
+function loadSnaps(){ try{ return JSON.parse(localStorage.getItem(SNAPKEY))||{}; }catch(e){ return {}; } }
+function saveSnaps(s){ try{ localStorage.setItem(SNAPKEY, JSON.stringify(s)); }catch(e){} }
+function autoSnapshot(){
+  const t=today(); const s=loadSnaps();
+  s[t]=JSON.stringify(store.days||{});            // cópia do dia (atualiza se mudar)
+  const keys=Object.keys(s).sort();
+  while(keys.length>30) delete s[keys.shift()];   // mantém só os últimos 30 dias
+  saveSnaps(s);
+}
 
 /* ---------- Datas ---------- */
 function today(){ return iso(new Date()); }
@@ -749,6 +770,7 @@ function renderHoje(){
     $('#peakCard').style.display='none';
   }
 
+  renderBackupBanner();
   $('#sexBtn').dataset.sel = rec.sex? '1':'0';
   $('#noteInp').value = rec.note||'';
 
@@ -1107,18 +1129,61 @@ function mergeStore(inc){
   }
   store.seen=true; save(); return changed;
 }
-$('#syncSend').addEventListener('click', async ()=>{
-  const data=JSON.stringify(store,null,1);
+async function doBackup(){
+  // payload só com os dados (sem PIN nem ajustes) — seguro para compartilhar
+  const data=JSON.stringify({app:'meu-ciclo', v:1, exportadoEm:today(), days:store.days}, null, 1);
   const name=`meu-ciclo-${today()}.json`;
   const file=new File([data], name, {type:'application/json'});
   if(navigator.canShare && navigator.canShare({files:[file]})){
-    try{
-      await navigator.share({files:[file], title:'Meu Ciclo', text:'Registros do Meu Ciclo 🌸'});
-      toast('Enviado 📤'); return;
-    }catch(err){ if(err && err.name==='AbortError') return; }
+    try{ await navigator.share({files:[file], title:'Meu Ciclo', text:'Backup do Meu Ciclo 🌸'}); }
+    catch(err){ if(err && err.name==='AbortError') return; }
+  } else {
+    download(name, data, 'application/json');
   }
-  download(name, data, 'application/json');
-  toast('Arquivo baixado — envie pelo WhatsApp 📤');
+  store.lastBackup=today(); delete store.bkSnooze; save();
+  toast('Backup salvo ✓'); renderBackupBanner(); renderBackupInfo();
+}
+$('#syncSend').addEventListener('click', doBackup);
+
+function renderBackupBanner(){
+  const el=$('#backupBanner'); if(!el) return;
+  const has=Object.keys(store.days).length>0;
+  if(!has || store.lastBackup===today() || store.bkSnooze===today()){ el.innerHTML=''; return; }
+  const last=store.lastBackup ? `Último backup: ${fmtShort(store.lastBackup)}` : 'Você ainda não fez um backup';
+  el.innerHTML=`<div class="card" style="background:var(--seco-bg);border-color:#cfe4f5;margin-top:14px">
+    <div style="display:flex;align-items:center;gap:11px">
+      <div style="font-size:26px">🛟</div>
+      <div style="flex:1"><b style="font-size:14px">Backup de hoje</b>
+      <div class="muted" style="font-size:12px">${last}. Salve uma cópia no Drive/WhatsApp — leva 5 segundos.</div></div>
+    </div>
+    <div class="btn-row" style="margin-top:10px">
+      <button class="btn btn-primary btn-sm" id="bkNow" style="flex:1">Salvar backup agora</button>
+      <button class="btn btn-line btn-sm" id="bkLater">Agora não</button>
+    </div></div>`;
+  $('#bkNow').addEventListener('click', doBackup);
+  $('#bkLater').addEventListener('click', ()=>{ store.bkSnooze=today(); save(); renderBackupBanner(); });
+}
+
+function renderBackupInfo(){
+  const bi=$('#bkInfo');
+  if(bi){
+    if(store.lastBackup){
+      const d=diffDays(store.lastBackup,today());
+      bi.innerHTML = d<=0 ? '✓ Backup feito hoje. Os dados só saem do aparelho quando você envia.'
+        : `Último backup: ${fmtShort(store.lastBackup)} (${d} dia${d>1?'s':''} atrás).`+(d>=7?' <b style="color:var(--mens)">Faça um novo!</b>':'');
+    } else bi.textContent='Você ainda não salvou um backup externo. Recomendo fazer hoje.';
+  }
+  const sel=$('#snapSelect');
+  if(sel){
+    const s=loadSnaps(); const keys=Object.keys(s).sort().reverse();
+    sel.innerHTML = keys.length ? keys.map(k=>`<option value="${k}">${fmtLong(k)}</option>`).join('') : '<option value="">(sem cópias ainda)</option>';
+  }
+}
+$('#snapRestore').addEventListener('click',()=>{
+  const k=$('#snapSelect').value; if(!k){ toast('Sem cópia para restaurar'); return; }
+  if(!confirm(`Restaurar a cópia de ${fmtLong(k)}? Os registros atuais serão substituídos por essa cópia.`)) return;
+  try{ store.days=JSON.parse(loadSnaps()[k]); save(); toast('Cópia restaurada ✓'); renderAll(); }
+  catch(e){ toast('Erro ao restaurar'); }
 });
 $('#syncRecv').addEventListener('click',()=>$('#importFile').click());
 $('#importFile').addEventListener('change',e=>{
@@ -1178,7 +1243,7 @@ function download(name,content,type){
 let toastT;
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2200); }
 
-function renderAll(){ renderHoje(); renderCiclo(); renderHist(); }
+function renderAll(){ renderHoje(); renderCiclo(); renderHist(); renderBackupInfo(); }
 
 /* ============================================================
    ONBOARDING
@@ -1208,6 +1273,7 @@ $('#obSkip').addEventListener('click',()=>{ $('#onb').classList.remove('show'); 
 /* ============================================================
    INIT
    ============================================================ */
+autoSnapshot();
 renderAll();
 checkLock();
 if(!store.seen) showOnb();
