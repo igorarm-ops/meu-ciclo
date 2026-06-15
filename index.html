@@ -220,13 +220,8 @@
     </div>
 
     <div class="card" id="obsCard">
-      <h2>2 · Observação do dia</h2>
-      <p class="sub">Registre <b>de manhã</b> e <b>à noite</b>. O dia recebe a observação mais fértil que ela teve.</p>
-
-      <div class="seg" id="periodSeg">
-        <button data-period="manha" type="button" aria-pressed="true">🌅 Manhã</button>
-        <button data-period="noite" type="button">🌙 Noite</button>
-      </div>
+      <h2>2 · Observação do dia <span style="font-weight:600;color:var(--rose)">· à noite</span></h2>
+      <p class="sub">Faça <b>uma anotação por dia, à noite</b>: registre a observação <b>mais fértil</b> que você teve ao longo do dia inteiro.</p>
 
       <label class="fld">Sensação ao passar (sem olhar) — o que sentiu na vulva</label>
       <div class="opts" id="sensOpts"></div>
@@ -234,7 +229,7 @@
       <label class="fld">Aparência (se observou)</label>
       <div class="opts" id="appOpts"></div>
 
-      <button class="btn btn-primary" id="saveObs" style="margin-top:16px">Salvar observação 🌅</button>
+      <button class="btn btn-primary" id="saveObs" style="margin-top:16px">Salvar observação do dia 🌙</button>
       <p class="muted" id="obsSaved" style="text-align:center;margin:10px 0 0"></p>
     </div>
 
@@ -343,8 +338,8 @@
     <details class="acc"><summary>Como observar (o passo a passo dela)</summary><div class="body">
       • Ao longo do dia, repare na <b>sensação</b> na vulva ao caminhar/passar: seca, úmida, molhada ou escorregadia.<br>
       • Sem investigar internamente — apenas o que sente e o que aparece naturalmente.<br>
-      • À <b>noite</b>, registre a observação <b>mais fértil</b> do dia inteiro.<br>
-      • Anotar de manhã e de noite cria o hábito e deixa o padrão nítido.
+      • À <b>noite</b>, faça <b>uma única anotação</b>: a observação <b>mais fértil</b> do dia inteiro.<br>
+      • De manhã o app só te lembra de começar a reparar — anotar mesmo, só à noite. É tudo que o método pede.
     </div></details>
 
     <details class="acc"><summary>O Dia Ápice (a chave do método)</summary><div class="body">
@@ -376,11 +371,11 @@
   <!-- ===================== CONFIG ===================== -->
   <section id="v-config" class="view">
     <div class="card">
-      <h2>⏰ Lembretes (manhã e noite)</h2>
-      <p class="sub">A forma mais confiável: baixar os lembretes para o calendário do celular dela. Tocam todo dia, mesmo com o app fechado.</p>
+      <h2>⏰ Lembretes</h2>
+      <p class="sub">Só dois avisos por dia, sem spam: de <b>manhã</b>, um toque suave para ela <b>começar a reparar</b> nas sensações; à <b>noite</b>, o lembrete de <b>fazer a anotação do dia</b>. Tocam todo dia, mesmo com o app fechado.</p>
       <div class="grid2">
-        <div><label class="fld">Lembrete da manhã</label><input type="time" id="remMorning" value="08:00"></div>
-        <div><label class="fld">Lembrete da noite</label><input type="time" id="remNight" value="21:30"></div>
+        <div><label class="fld">Manhã · reparar</label><input type="time" id="remMorning" value="08:00"></div>
+        <div><label class="fld">Noite · anotar</label><input type="time" id="remNight" value="21:30"></div>
       </div>
       <button class="btn btn-primary" id="dlIcs" style="margin-top:14px">📅 Baixar lembretes (.ics)</button>
       <button class="btn btn-line" id="notifBtn" style="margin-top:8px;width:100%">🔔 Ativar notificação enquanto o app estiver aberto</button>
@@ -465,10 +460,9 @@ const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 /* ---------- Modelo de dados ---------- */
-// store.days[YYYY-MM-DD] = { mens:0..4, obs:{manha:{sens,app}, noite:{sens,app}}, peak:true }
+// store.days[YYYY-MM-DD] = { mens:0..4, obs:{sens,app}, sex:true, note, peak:true, u }
 let store = load();
 let selDate = today();
-let curPeriod = 'manha';
 
 function load(){
   try{ return JSON.parse(localStorage.getItem(KEY)) || {days:{}, seen:false}; }
@@ -510,18 +504,14 @@ const APP = [
   {v:'claro',ic:'🥚',t:'Claro e elástico', s:'Transparente, estica',       sc:3,lvl:'#e5524f'},
 ];
 
-function dayScore(rec){ // observação mais fértil do dia
+function dayScore(rec){ // fertilidade da observação do dia
   if(!rec || !rec.obs) return 0;
-  let m=0;
-  ['manha','noite'].forEach(p=>{
-    const o=rec.obs[p]; if(!o) return;
-    const s=(SENS.find(x=>x.v===o.sens)||{}).sc||0;
-    const a=(APP.find(x=>x.v===o.app)||{}).sc||0;
-    m=Math.max(m,s,a);
-  });
-  return m;
+  const o=rec.obs;
+  const s=(SENS.find(x=>x.v===o.sens)||{}).sc||0;
+  const a=(APP.find(x=>x.v===o.app)||{}).sc||0;
+  return Math.max(s,a);
 }
-function hasObs(rec){ return rec && rec.obs && (rec.obs.manha||rec.obs.noite); }
+function hasObs(rec){ return !!(rec && rec.obs && (rec.obs.sens||rec.obs.app)); }
 
 /* ============================================================
    CICLOS — divide os dias em ciclos a partir do início da menstruação
@@ -711,7 +701,7 @@ function renderHoje(){
     </button>`).join('');
 
   // observação (sensação/aparência) do período atual
-  const o = (rec.obs && rec.obs[curPeriod]) || {};
+  const o = rec.obs || {};
   $('#sensOpts').innerHTML = SENS.map(s=>`
     <button class="opt" data-sens="${s.v}" data-sel="${o.sens===s.v?1:0}">
       <span class="dot"></span><span class="ic">${s.ic}</span>
@@ -724,16 +714,7 @@ function renderHoje(){
       <span class="tx"><b>${a.t}</b><span>${a.s}</span></span>
       <span class="lvl" style="background:${a.lvl}">${['seco','baixo','médio','pico'][a.sc]}</span>
     </button>`).join('');
-  $('#saveObs').textContent = curPeriod==='manha' ? 'Salvar observação 🌅' : 'Salvar observação 🌙';
-  // marca período já registrado
-  $$('#periodSeg button').forEach(b=>{
-    const p=b.dataset.period; const done = rec.obs && rec.obs[p];
-    b.setAttribute('aria-pressed', String(p===curPeriod));
-    b.textContent = (p==='manha'?'🌅 Manhã':'🌙 Noite') + (done?' ✓':'');
-  });
-  const both = rec.obs && rec.obs.manha && rec.obs.noite;
-  $('#obsSaved').textContent = both ? '✓ Manhã e noite registradas hoje. Ótimo!' :
-    (rec.obs && (rec.obs.manha||rec.obs.noite) ? '✓ Um período registrado. Falta o outro.' : '');
+  $('#obsSaved').textContent = hasObs(rec) ? '✓ Observação do dia registrada.' : '';
 
   // veredito
   const cyc=cycleOf(selDate);
@@ -943,10 +924,6 @@ $('#mensOpts').addEventListener('click',e=>{
   if(v>=2) toast('Menstruação registrada 🩸');
   renderHoje(); renderCiclo();
 });
-$('#periodSeg').addEventListener('click',e=>{
-  const b=e.target.closest('[data-period]'); if(!b)return;
-  curPeriod=b.dataset.period; renderHoje();
-});
 let pendSens=null, pendApp=null;
 $('#sensOpts').addEventListener('click',e=>{
   const b=e.target.closest('[data-sens]'); if(!b)return;
@@ -959,18 +936,15 @@ $('#appOpts').addEventListener('click',e=>{
 $('#saveObs').addEventListener('click',()=>{
   if(isFuture(selDate)){ toast('Não dá para registrar o futuro 😉'); return; }
   const rec=getRec(selDate)||{};
-  rec.obs=rec.obs||{};
-  const existing=rec.obs[curPeriod]||{};
+  const existing=rec.obs||{};
   const sens=pendSens|| existing.sens || $('#sensOpts .opt[data-sel="1"]')?.dataset.sens;
   const app=pendApp|| existing.app || $('#appOpts .opt[data-sel="1"]')?.dataset.app;
   if(!sens && !app){ toast('Escolha ao menos a sensação'); return; }
-  rec.obs[curPeriod]={sens:sens||'seca', app:app||'nada'};
+  rec.obs={sens:sens||'seca', app:app||'nada'};
   rec.u=Date.now();
   store.days[selDate]=rec; save();
   pendSens=pendApp=null;
-  toast(curPeriod==='manha'?'Manhã registrada 🌅':'Noite registrada 🌙');
-  // alterna automaticamente para o período que falta
-  if(curPeriod==='manha' && !(rec.obs.noite)) curPeriod='noite';
+  toast('Observação do dia registrada ✓');
   renderHoje(); renderCiclo();
 });
 $('#peakConfirm').addEventListener('click',()=>{
@@ -1008,7 +982,6 @@ $('#dateSeg').addEventListener('click',e=>{
   const b=e.target.closest('[data-shift]'); if(!b)return;
   const sh=+b.dataset.shift;
   selDate = sh===0?today():addDays(selDate,sh);
-  curPeriod='manha';
   renderHoje();
 });
 
@@ -1036,7 +1009,7 @@ $('#cycNext').addEventListener('click',()=>{
 $('#cycCur').addEventListener('click',()=>{ cycIdx=null; renderCiclo(); });
 $('#strip').addEventListener('click',e=>{
   const c=e.target.closest('[data-jump]'); if(!c)return;
-  selDate=c.dataset.jump; curPeriod='manha';
+  selDate=c.dataset.jump;
   $$('nav.tabs button').forEach(x=>x.setAttribute('aria-current', x.dataset.view==='hoje'?'true':'false'));
   $$('.view').forEach(x=>x.classList.remove('active')); $('#v-hoje').classList.add('active');
   renderHoje(); window.scrollTo({top:0,behavior:'smooth'});
@@ -1062,26 +1035,27 @@ function buildICS(m,n){
       'END:VEVENT'].join('\r\n');
   }
   return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//MeuCiclo//Billings//PT','CALSCALE:GREGORIAN',
-    ev('mc-manha',mh.padStart(2,'0'),mm,'🌅 Billings: anotar sensação (manhã)','Registre a observação da manhã no app Meu Ciclo.'),
-    ev('mc-noite',nh.padStart(2,'0'),nm,'🌙 Billings: anotar sensação (noite)','Registre a observação mais fértil do dia no app Meu Ciclo.'),
+    ev('mc-manha',mh.padStart(2,'0'),mm,'🌸 Billings: repare nas sensacoes hoje','So um lembrete para comecar a prestar atencao na sensacao ao longo do dia. A anotacao e a noite, uma so.'),
+    ev('mc-noite',nh.padStart(2,'0'),nm,'🌙 Billings: anotar a observacao do dia','Registre no app Meu Ciclo a sensacao mais fertil que voce teve hoje. Uma anotacao por dia.'),
     'END:VCALENDAR'].join('\r\n');
 }
 $('#notifBtn').addEventListener('click', async ()=>{
   if(!('Notification' in window)){ toast('Notificações não suportadas aqui'); return; }
   const p=await Notification.requestPermission();
-  if(p==='granted'){ scheduleNotif(); toast('Notificações ativadas 🔔'); new Notification('Meu Ciclo','Tudo certo! Vou lembrar de manhã e à noite.'); }
+  if(p==='granted'){ scheduleNotif(); toast('Notificações ativadas 🔔'); new Notification('Meu Ciclo','Tudo certo! De manhã eu lembro de reparar, à noite de anotar.'); }
   else toast('Permissão negada');
 });
 function scheduleNotif(){
   // só funciona com app aberto; calendário (.ics) é o método confiável
   if(Notification.permission!=='granted')return;
-  const times=[$('#remMorning').value,$('#remNight').value];
+  let lastFired='';
   setInterval(()=>{
+    const m=$('#remMorning').value, n=$('#remNight').value;
     const now=new Date(); const hm=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
-    if(times.includes(hm) && now.getSeconds()<30){
-      new Notification('🌸 Meu Ciclo', {body:'Hora de anotar a sensação no app.'});
-    }
-  },30000);
+    if(hm===lastFired) return; // evita repetir no mesmo minuto (sem spam)
+    if(hm===m){ lastFired=hm; new Notification('🌸 Meu Ciclo',{body:'Comece a reparar nas sensações hoje. A anotação é só à noite.'}); }
+    else if(hm===n){ lastFired=hm; new Notification('🌙 Meu Ciclo',{body:'Hora de anotar a observação do dia — uma só.'}); }
+  },20000);
 }
 function mergeStore(inc){
   if(!inc || typeof inc.days!=='object') return -1;
@@ -1170,7 +1144,7 @@ function renderAll(){ renderHoje(); renderCiclo(); renderHist(); }
    ============================================================ */
 const OB=[
   {ic:'🌸',t:'Bem-vinda ao Meu Ciclo',x:'Um app simples e privado para viverem juntos o Método Billings. Tudo fica só neste celular.'},
-  {ic:'📝',t:'Anote de manhã e à noite',x:'Duas vezes por dia você registra a sensação e a aparência do muco. O app cuida do resto.'},
+  {ic:'📝',t:'Uma anotação por dia, à noite',x:'À noite você registra a observação mais fértil do dia. De manhã o app só te lembra de reparar. O resto é com ele.'},
   {ic:'⭐',t:'O app encontra o Ápice',x:'Ele identifica o dia mais fértil (o Pico) e aplica a regra do Ápice + 3 para você.'},
   {ic:'🚦',t:'Veredito claro todo dia',x:'Verde = infértil (disponível). Amarelo = fértil (evitar). Sem adivinhação — na dúvida, ele avisa para esperar.'},
   {ic:'📅',t:'Lembretes no calendário',x:'Em Ajustes, baixe os lembretes para tocarem todo dia. E adicione o app à tela inicial.'},
